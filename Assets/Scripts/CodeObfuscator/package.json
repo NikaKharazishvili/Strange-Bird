@@ -1,0 +1,10 @@
+{
+  "name": "com.nikson.codeobfuscator",
+  "version": "1.0.0",
+  "displayName": "Code Obfuscator",
+  "description": "Renames private methods and fields in your game's assemblies after a build, to make the code harder to read if stolen or decompiled.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.nuget.mono-cecil": "1.11.6"
+  }
+}

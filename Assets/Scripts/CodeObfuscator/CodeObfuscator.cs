@@ -118,7 +118,8 @@ namespace Nikson
         static bool CanRename(MethodDefinition method, HashSet<string> excluded) => method.IsPrivate && !method.IsVirtual && !method.IsConstructor && !method.IsSpecialName && method.Overrides.Count == 0
             && !method.DeclaringType.HasGenericParameters && !IsCompilerGenerated(method.Name) && !ReservedNames.Contains(method.Name) && !excluded.Contains(method.Name) && !HasDontObfuscate(method);
 
-        static bool CanRename(FieldDefinition field, HashSet<string> excluded) => field.IsPrivate && !field.DeclaringType.IsEnum && !field.DeclaringType.HasGenericParameters && !HasAttribute(field, nameof(SerializeField))
+        static bool CanRename(FieldDefinition field, HashSet<string> excluded) => field.IsPrivate && !field.DeclaringType.IsEnum && !field.DeclaringType.HasGenericParameters
+            && !HasAttribute(field, nameof(SerializeField)) && !HasAttribute(field, "SerializeReference")
             && !IsCompilerGenerated(field.Name) && !excluded.Contains(field.Name) && !HasDontObfuscate(field);
 
         static bool IsCompilerGenerated(string name) => name.Contains('<') || name.Contains('>') || name is ".ctor" or ".cctor";
