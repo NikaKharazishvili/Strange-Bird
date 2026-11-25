@@ -14,6 +14,7 @@ public sealed partial class MenuManager
     [SerializeField] Image soundsCheckmark, birdsCheckmark, fpsCheckmark;
     [SerializeField] AudioClip keySelectSound;
     string flapKey;
+    Coroutine fpsLoop, detectFlapKeyCoroutine;
     int gameSpeed;
     bool spawnBirds, showFps;
 
@@ -40,12 +41,13 @@ public sealed partial class MenuManager
             case MenuOption.ToggleFps:
                 showFps = !showFps;
                 fpsText.gameObject.SetActive(showFps);
-                if (showFps) InvokeRepeating(nameof(ShowFps), 0, FPSHudUpdateInterval);
-                else CancelInvoke(nameof(ShowFps));
+                if (showFps) { if (fpsLoop == null) fpsLoop = this.Repeat(0, FPSHudUpdateInterval, ShowFps); }
+                else this.StopRepeat(ref fpsLoop);
                 SetCheckmarkSprite(fpsCheckmark, showFps);
                 break;
             case MenuOption.SelectFlapKey:
-                StartCoroutine(nameof(DetectFlapKey));
+                if (detectFlapKeyCoroutine != null) StopCoroutine(detectFlapKeyCoroutine);
+                detectFlapKeyCoroutine = StartCoroutine(DetectFlapKey());
                 break;
         }
     }

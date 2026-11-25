@@ -55,7 +55,8 @@ public sealed partial class MenuManager : MonoBehaviour
         optionMenu.SetActive(false);
 
         // Cancel an unfinished key selection and restore the current key name
-        StopCoroutine(nameof(DetectFlapKey));
+        if (detectFlapKeyCoroutine != null) StopCoroutine(detectFlapKeyCoroutine);
+        detectFlapKeyCoroutine = null;
         flapKeyText.text = FormatKeyName(flapKey);
     }
 
@@ -82,7 +83,7 @@ public sealed partial class MenuManager : MonoBehaviour
 
         showFps = GetPrefBool(PrefKeys.ShowFps);
         fpsText.gameObject.SetActive(showFps);
-        if (showFps && !IsInvoking(nameof(ShowFps))) InvokeRepeating(nameof(ShowFps), 0, Constants.FPSHudUpdateInterval); // Guard against double invoke after ResetGameProgress
+        if (showFps && fpsLoop == null) fpsLoop = this.Repeat(0, Constants.FPSHudUpdateInterval, ShowFps); // Guard against double start after ResetGameProgress
         SetCheckmarkSprite(fpsCheckmark, showFps);
 
         flapKey = PlayerPrefs.GetString(PrefKeys.FlapKey, PrefKeys.DefaultFlapKey);

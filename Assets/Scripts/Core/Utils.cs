@@ -22,6 +22,30 @@ public static class Utils
         yield return wait;
         if (mb) action?.Invoke();
     }
+
+    /// <summary>
+    /// Calls the action after firstDelay seconds and then every interval seconds until the returned coroutine is stopped with StopCoroutine.
+    /// Replaces InvokeRepeating, which finds methods by string name and breaks once CodeObfuscator renames them.
+    /// </summary>
+    public static Coroutine Repeat(this MonoBehaviour mb, float firstDelay, float interval, Action action) => mb.StartCoroutine(RepeatRoutine(firstDelay, interval, action));
+
+    static IEnumerator RepeatRoutine(float firstDelay, float interval, Action action)
+    {
+        if (firstDelay > 0) yield return new WaitForSeconds(firstDelay);
+        var wait = new WaitForSeconds(interval);
+        while (true)
+        {
+            action();
+            yield return wait;
+        }
+    }
+
+    /// <summary>Stops a coroutine started with Repeat (if any) and clears the reference.</summary>
+    public static void StopRepeat(this MonoBehaviour mb, ref Coroutine coroutine)
+    {
+        if (coroutine != null) mb.StopCoroutine(coroutine);
+        coroutine = null;
+    }
     #endregion
 
 

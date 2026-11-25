@@ -40,6 +40,7 @@ public sealed class GameManager : MonoBehaviour
     bool showFpsOption, spawnBirdsOption;
 
     Coroutine flapRespawnCoroutine;
+    Coroutine birdLoop, obstacleCoinLoop, dayNightLoop, scoreLoop; // Started with Repeat, stopped when the player dies
 
     public Player Player => player;
     public SpriteAtlas SpriteAtlas => spriteAtlas;
@@ -54,7 +55,7 @@ public sealed class GameManager : MonoBehaviour
         player.OnDeath += StopAllObjects;
         player.OnRespawn += Restart;
         StartGameplayLoops();
-        if (showFpsOption) InvokeRepeating(nameof(UpdateFpsHud), 0, FPSHudUpdateInterval);
+        if (showFpsOption) this.Repeat(0, FPSHudUpdateInterval, UpdateFpsHud);
     }
 
     void OnDestroy()
@@ -68,19 +69,20 @@ public sealed class GameManager : MonoBehaviour
     #region Gameplay loops
     void StartGameplayLoops()
     {
-        if (spawnBirdsOption) InvokeRepeating(nameof(SpawnBird), BirdSpawnDelay, BirdSpawnDelay);
+        StopGameplayLoops(); // Never run two copies of a loop
+        if (spawnBirdsOption) birdLoop = this.Repeat(BirdSpawnDelay, BirdSpawnDelay, SpawnBird);
         float spawnDelay = ObstacleAndCoinSpawnDelay[gameSpeed];
-        InvokeRepeating(nameof(SpawnObstacleAndCoin), spawnDelay, spawnDelay);
-        InvokeRepeating(nameof(DayNightCycle), DayNightCycleInterval, DayNightCycleInterval);
-        InvokeRepeating(nameof(GainScore), ScoreGainInterval, ScoreGainInterval);
+        obstacleCoinLoop = this.Repeat(spawnDelay, spawnDelay, SpawnObstacleAndCoin);
+        dayNightLoop = this.Repeat(DayNightCycleInterval, DayNightCycleInterval, DayNightCycle);
+        scoreLoop = this.Repeat(ScoreGainInterval, ScoreGainInterval, GainScore);
     }
 
     void StopGameplayLoops()
     {
-        CancelInvoke(nameof(SpawnBird));
-        CancelInvoke(nameof(SpawnObstacleAndCoin));
-        CancelInvoke(nameof(DayNightCycle));
-        CancelInvoke(nameof(GainScore));
+        this.StopRepeat(ref birdLoop);
+        this.StopRepeat(ref obstacleCoinLoop);
+        this.StopRepeat(ref dayNightLoop);
+        this.StopRepeat(ref scoreLoop);
     }
 
     void UpdateFpsHud() => fpsText.text = FpsLabel();
@@ -212,7 +214,7 @@ public sealed class GameManager : MonoBehaviour
         gameSpeed = Mathf.Clamp(PlayerPrefs.GetInt(PrefKeys.GameSpeed), 0, MaxGameSpeed);
         showFpsOption = GetPrefBool(PrefKeys.ShowFps);
         fpsText.gameObject.SetActive(showFpsOption);
-        spawnBirdsOption = GetPrefBool(PrefKeys.SpawnBirds);
+        spawnBirdsOption = GetPrefBool(PrefKeys.SpawnBirds, true); // Same default as the menu toggle
 
         Obstacle.SetSpeed(gameSpeed);
         Coin.SetSpeed(gameSpeed);

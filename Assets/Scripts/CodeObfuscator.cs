@@ -26,8 +26,7 @@ namespace Nikson
         public static string LastRunSummary { get; private set; } = "not run yet";
 
         static readonly string[] ProcessedAssemblyNames = { "Assembly-CSharp.dll", "Assembly-CSharp-firstpass.dll" };
-        static readonly string[] ReflectionCallNames = { "GetField", "GetMethod", "GetProperty", "GetNestedType", "SendMessage", "BroadcastMessage", "Invoke", "InvokeRepeating", "StartCoroutine" };
-        static readonly string[] InspectorNameExtensions = { "*.anim", "*.unity", "*.prefab" };
+        static readonly string[] InspectorNameExtensions = { "*.anim", "*.unity", "*.prefab", "*.asset" };
         static readonly HashSet<string> ReservedNames = new()
         {
             "Awake", "Start", "OnEnable", "OnDisable", "OnDestroy", "Update", "FixedUpdate", "LateUpdate", "OnValidate", "Reset", "OnGUI",
@@ -47,10 +46,15 @@ namespace Nikson
             var excluded = ScanInspectorMethodNames();
             int methods = 0, fields = 0;
             var nameMap = new List<string>();
+            // Scan every assembly first: code in one assembly can refer by name to a member of another
             foreach (var file in files)
             {
                 using var assembly = AssemblyDefinition.ReadAssembly(file.path, new ReaderParameters { InMemory = true });
-                ScanReflectionLiterals(assembly.MainModule, excluded);
+                ScanStringLiterals(assembly.MainModule, excluded);
+            }
+            foreach (var file in files)
+            {
+                using var assembly = AssemblyDefinition.ReadAssembly(file.path, new ReaderParameters { InMemory = true });
                 int counter = 0;
                 foreach (var type in assembly.MainModule.Types) RenameType(type, excluded, ref counter, ref methods, ref fields, nameMap);
                 AddSuppressIldasm(assembly);
@@ -83,23 +87,20 @@ namespace Nikson
             assembly.CustomAttributes.Add(new CustomAttribute(ctor));
         }
 
-        static void ScanReflectionLiterals(ModuleDefinition module, HashSet<string> excluded) { foreach (var type in module.Types) ScanReflectionLiteralsInType(type, excluded); }
+        // Any member whose name also appears as a string literal anywhere in the code might be looked up by name (Invoke, InvokeRepeating, SendMessage, StartCoroutine("X"),
+        // GetMethod, JSON/reflection helpers...), so it is never renamed. Deliberately conservative: it works in any project without the user changing their code,
+        // at the cost of occasionally keeping a name that only happens to equal an unrelated string.
+        static void ScanStringLiterals(ModuleDefinition module, HashSet<string> excluded) { foreach (var type in module.Types) ScanStringLiteralsInType(type, excluded); }
 
-        static void ScanReflectionLiteralsInType(TypeDefinition type, HashSet<string> excluded)
+        static void ScanStringLiteralsInType(TypeDefinition type, HashSet<string> excluded)
         {
             foreach (var method in type.Methods)
             {
                 if (!method.HasBody) continue;
-                string pendingLiteral = null;
                 foreach (var instruction in method.Body.Instructions)
-                {
-                    if (instruction.OpCode == OpCodes.Ldstr) { pendingLiteral = (string)instruction.Operand; continue; }
-                    if (pendingLiteral != null && instruction.OpCode is var code && (code == OpCodes.Call || code == OpCodes.Callvirt) && instruction.Operand is MethodReference called && ReflectionCallNames.Contains(called.Name))
-                        excluded.Add(pendingLiteral);
-                    pendingLiteral = null;
-                }
+                    if (instruction.OpCode == OpCodes.Ldstr) excluded.Add((string)instruction.Operand);
             }
-            foreach (var nested in type.NestedTypes) ScanReflectionLiteralsInType(nested, excluded);
+            foreach (var nested in type.NestedTypes) ScanStringLiteralsInType(nested, excluded);
         }
 
         static void RenameType(TypeDefinition type, HashSet<string> excluded, ref int counter, ref int methods, ref int fields, List<string> nameMap)
